@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contador de Clics - Banear a Rosczony</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js para efectos de sonido sintetizados sin archivos externos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Font Awesome para íconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter y Montserrat/Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-short': 'bounce 0.3s ease-in-out 1',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Partículas flotantes con cada clic */
+        .click-particle {
+            position: absolute;
+            pointer-events: none;
+            animation: floatUp 0.7s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+            font-weight: 800;
+            font-family: 'Outfit', sans-serif;
+            user-select: none;
+            z-index: 50;
+        }
+
+        @keyframes floatUp {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1) rotate(0deg);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-90px) scale(1.6) rotate(var(--rot, 10deg));
+            }
+        }
+
+        .btn-active-effect {
+            transition: transform 0.05s ease, box-shadow 0.05s ease;
+        }
+
+        .btn-active-effect:active {
+            transform: scale(0.93) translateY(4px);
+        }
+
+        /* Barra de progreso animada */
+        .progress-glow {
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-full flex flex-col justify-between font-sans selection:bg-red-500 selection:text-white relative overflow-x-hidden">
+
+    <!-- Efecto de Fondo -->
+    <div class="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900/20 via-slate-950 to-slate-950 pointer-events-none"></div>
+
+    <!-- Encabezado / Control de Sonido -->
+    <header class="w-full max-w-3xl mx-auto px-6 pt-6 flex justify-between items-center relative z-10">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center shadow-lg shadow-red-500/20">
+                <i class="fa-solid fa-gavel text-white text-lg"></i>
+            </div>
+            <span class="font-display font-bold text-lg tracking-wide text-slate-200">Baneo Panel v1.0</span>
+        </div>
+
+        <button id="soundToggleBtn" onclick="toggleSound()" class="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition flex items-center gap-2 text-sm font-medium">
+            <i id="soundIcon" class="fa-solid fa-volume-high text-red-400"></i>
+            <span id="soundText">Sonido On</span>
+        </button>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="w-full max-w-3xl mx-auto px-6 py-8 flex flex-col items-center justify-center flex-grow text-center relative z-10">
+        
+        <!-- Título Solicitado -->
+        <div class="mb-6">
+            <span class="inline-block px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold uppercase tracking-widest mb-3">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i> Campaña Comunitaria
+            </span>
+            <h1 id="mainTitle" class="text-2xl sm:text-4xl md:text-5xl font-black font-display tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-300 to-red-500 leading-tight">
+                CLICKS PARA BANEAR A ROSCZONY POR PERUANO
+            </h1>
+        </div>
+
+        <!-- Pantalla del Contador -->
+        <div class="w-full max-w-md my-4 bg-slate-900/80 backdrop-blur-md rounded-3xl border border-slate-800 p-6 shadow-2xl relative">
+            <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Total de votos acumulados</div>
+            
+            <div id="counterDisplay" class="font-display text-6xl sm:text-7xl font-black text-white tracking-tight my-2 drop-shadow-[0_0_25px_rgba(239,68,68,0.3)] transition-all">
+                0
+            </div>
+
+            <!-- Meta / Barra de Progreso -->
+            <div class="mt-4 pt-4 border-t border-slate-800/80">
+                <div class="flex justify-between text-xs font-medium text-slate-400 mb-1.5">
+                    <span>Progreso de baneo</span>
+                    <span id="progressPercentage" class="text-red-400 font-bold">0%</span>
+                </div>
+                <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/50">
+                    <div id="progressBar" class="h-full bg-gradient-to-r from-amber-500 to-red-600 rounded-full w-0 transition-all duration-200 progress-glow"></div>
+                </div>
+                <div class="text-[11px] text-slate-500 mt-2 flex justify-between">
+                    <span>Meta actual: <strong id="nextGoalText" class="text-slate-300">100</strong> clics</span>
+                    <span id="clicksPerSec">0 Clics/seg</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón Principal -->
+        <div class="relative my-6" id="buttonContainer">
+            <button id="clickBtn" onclick="registerClick(event)" class="btn-active-effect group relative inline-flex items-center justify-center px-10 py-6 sm:px-14 sm:py-7 text-xl sm:text-2xl font-black font-display text-white bg-gradient-to-b from-red-500 to-red-700 hover:from-red-400 hover:to-red-600 rounded-2xl shadow-[0_10px_35px_rgba(220,38,38,0.5)] border-b-4 border-red-900 active:border-b-0 uppercase tracking-wider select-none overflow-hidden cursor-pointer">
+                <span class="relative z-10 flex items-center gap-3">
+                    <i class="fa-solid fa-gavel text-2xl sm:text-3xl group-hover:rotate-12 transition-transform"></i>
+                    ¡BANEAR AHORA!
+                </span>
+                <!-- Destello visual en el botón -->
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+            </button>
+        </div>
+
+        <!-- Mensaje / Logro Dinámico -->
+        <div id="statusMessage" class="h-8 text-sm font-semibold text-amber-400 transition-opacity opacity-0 flex items-center gap-2">
+            <i class="fa-solid fa-bolt"></i> <span id="statusText">¡Primer voto registrado!</span>
+        </div>
+
+        <!-- Contadores Adicionales -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-md mt-4">
+            <div class="bg-slate-900/50 border border-slate-800/80 rounded-xl p-3 text-center">
+                <div class="text-[11px] text-slate-400 font-medium">Racha Máxima</div>
+                <div id="maxCPS" class="text-lg font-bold text-slate-200">0 CPS</div>
+            </div>
+            <div class="bg-slate-900/50 border border-slate-800/80 rounded-xl p-3 text-center">
+                <div class="text-[11px] text-slate-400 font-medium">Nivel de Ban</div>
+                <div id="banLevel" class="text-lg font-bold text-red-400">Leve</div>
+            </div>
+            <div class="bg-slate-900/50 border border-slate-800/80 rounded-xl p-3 text-center col-span-2 sm:col-span-1">
+                <div class="text-[11px] text-slate-400 font-medium">Estado</div>
+                <div id="banStatus" class="text-lg font-bold text-amber-400">Procesando</div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Pie de página y reinicio -->
+    <footer class="w-full max-w-3xl mx-auto px-6 pb-6 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-4 relative z-10">
+        <div>Presiona el botón lo más rápido que puedas.</div>
+        <button onclick="resetCounter()" class="text-slate-500 hover:text-red-400 underline transition flex items-center gap-1">
+            <i class="fa-solid fa-rotate-right"></i> Reiniciar contador
+        </button>
+    </footer>
+
+    <!-- Lógica JavaScript -->
+    <script>
+        // Estado global
+        let count = parseInt(localStorage.getItem('rosczony_clicks')) || 0;
+        let soundEnabled = true;
+        let clickTimestamps = [];
+        let maxCpsValue = 0;
+        let currentGoal = 100;
+
+        // Metas de baneo
+        const goals = [100, 500, 1000, 2500, 5000, 10000];
+
+        // Elementos del DOM
+        const counterDisplay = document.getElementById('counterDisplay');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercentage = document.getElementById('progressPercentage');
+        const nextGoalText = document.getElementById('nextGoalText');
+        const clicksPerSecDisplay = document.getElementById('clicksPerSec');
+        const maxCPSDisplay = document.getElementById('maxCPS');
+        const banLevelDisplay = document.getElementById('banLevel');
+        const banStatusDisplay = document.getElementById('banStatus');
+        const statusMessage = document.getElementById('statusMessage');
+        const statusText = document.getElementById('statusText');
+
+        // Configuración de Sonido con Tone.js
+        let synth, polySynth;
+
+        function initAudio() {
+            if (!synth) {
+                synth = new Tone.Synth({
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 }
+                }).toDestination();
+                synth.volume.value = -12;
+
+                polySynth = new Tone.PolySynth(Tone.Synth).toDestination();
+                polySynth.volume.value = -10;
+            }
+        }
+
+        function playClickSound() {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+                // Tono aleatorio dinámico para que no sea monótono
+                const pitch = 300 + Math.random() * 200 + (count % 20) * 10;
+                synth.triggerAttackRelease(pitch, '32n');
+            } catch(e) {
+                console.log("Audio not allowed yet");
+            }
+        }
+
+        function playMilestoneSound() {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                polySynth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n");
+            } catch(e){}
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const soundIcon = document.getElementById('soundIcon');
+            const soundText = document.getElementById('soundText');
+            
+            if (soundEnabled) {
+                soundIcon.className = "fa-solid fa-volume-high text-red-400";
+                soundText.innerText = "Sonido On";
+            } else {
+                soundIcon.className = "fa-solid fa-volume-xmark text-slate-500";
+                soundText.innerText = "Sonido Off";
+            }
+        }
+
+        // Registrar Clic
+        function registerClick(e) {
+            count++;
+            localStorage.setItem('rosczony_clicks', count);
+
+            // Sonido
+            playClickSound();
+
+            // Calcular CPS
+            const now = Date.now();
+            clickTimestamps.push(now);
+
+            // Partícula flotante (+1 o texto)
+            createParticle(e);
+
+            // Actualizar interfaz
+            updateUI();
+
+            // Efecto visual en el número
+            counterDisplay.classList.remove('animate-bounce-short');
+            void counterDisplay.offsetWidth; // Trigger reflow
+            counterDisplay.classList.add('animate-bounce-short');
+        }
+
+        // Crear partícula en la posición del clic
+        function createParticle(e) {
+            const container = document.getElementById('buttonContainer');
+            const rect = container.getBoundingClientRect();
+            
+            // Coordenadas fijas si es clic con teclado o toque
+            let x = e.clientX ? (e.clientX - rect.left) : (rect.width / 2);
+            let y = e.clientY ? (e.clientY - rect.top) : (rect.height / 2);
+
+            const particle = document.createElement('div');
+            particle.className = 'click-particle text-red-400 drop-shadow-[0_2px_8px_rgba(239,68,68,0.8)]';
+            
+            // Textos variados para hacer divertido el contador
+            const texts = ["+1 BAN", "+1 VOTO", "¡BANEADO!", "+1", "+1", "CHAU ROSCZONY"];
+            const randomText = texts[Math.floor(Math.random() * texts.length)];
+            
+            particle.innerText = (count % 25 === 0) ? "¡SÚPER BAN!" : randomText;
+            
+            const randomRotation = (Math.random() * 30 - 15) + 'deg';
+            particle.style.setProperty('--rot', randomRotation);
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+
+            container.appendChild(particle);
+
+            setTimeout(() => {
+                particle.remove();
+            }, 700);
+        }
+
+        // Actualizar UI completa
+        function updateUI() {
+            counterDisplay.innerText = count.toLocaleString();
+
+            // Determinar meta actual
+            currentGoal = goals.find(g => g > count) || (Math.ceil((count + 1) / 5000) * 5000);
+            nextGoalText.innerText = currentGoal.toLocaleString();
+
+            // Porcentaje
+            const prevGoal = goals[goals.indexOf(currentGoal) - 1] || 0;
+            const progress = Math.min(100, Math.max(0, ((count - prevGoal) / (currentGoal - prevGoal)) * 100));
+            progressBar.style.width = `${progress}%`;
+            progressPercentage.innerText = `${Math.floor(progress)}%`;
+
+            // Nivel de Ban según el conteo
+            if (count < 100) {
+                banLevelDisplay.innerText = "Leve";
+                banLevelDisplay.className = "text-lg font-bold text-amber-400";
+                banStatusDisplay.innerText = "Sanción";
+            } else if (count < 500) {
+                banLevelDisplay.innerText = "Temp Ban";
+                banLevelDisplay.className = "text-lg font-bold text-orange-400";
+                banStatusDisplay.innerText = "Suspendido";
+            } else if (count < 1000) {
+                banLevelDisplay.innerText = "Hard Ban";
+                banLevelDisplay.className = "text-lg font-bold text-red-400";
+                banStatusDisplay.innerText = "Expulsado";
+            } else {
+                banLevelDisplay.innerText = "PERMABAN";
+                banLevelDisplay.className = "text-lg font-bold text-purple-400 animate-pulse";
+                banStatusDisplay.innerText = "DESAPARECIDO";
+            }
+
+            // Mensajes por hito
+            if (count === 1) showStatus("¡Primer clic! El proceso de baneo ha comenzado.");
+            if (count === 50) showStatus("¡50 clics! Rosczony ya siente la presión.");
+            if (count === 100) { showStatus("¡100 CLICS! Primer nivel de baneo completado 🎉"); playMilestoneSound(); }
+            if (count === 500) { showStatus("¡500 CLICS! Suspensión temporal activada 🔥"); playMilestoneSound(); }
+            if (count === 1000) { showStatus("¡1000 CLICS! PERMABAN DEFINITIVO 🚫"); playMilestoneSound(); }
+        }
+
+        function showStatus(text) {
+            statusText.innerText = text;
+            statusMessage.classList.remove('opacity-0');
+            statusMessage.classList.add('opacity-100');
+            setTimeout(() => {
+                statusMessage.classList.remove('opacity-100');
+                statusMessage.classList.add('opacity-0');
+            }, 3000);
+        }
+
+        // Cálculo periódico de Clics Por Segundo (CPS)
+        setInterval(() => {
+            const now = Date.now();
+            clickTimestamps = clickTimestamps.filter(t => now - t <= 1000);
+            const currentCPS = clickTimestamps.length;
+            
+            clicksPerSecDisplay.innerText = `${currentCPS} Clics/seg`;
+
+            if (currentCPS > maxCpsValue) {
+                maxCpsValue = currentCPS;
+                maxCPSDisplay.innerText = `${maxCpsValue} CPS`;
+            }
+        }, 200);
+
+        // Reiniciar
+        function resetCounter() {
+            if (confirm("¿Estás seguro de reiniciar los clics para el baneo?")) {
+                count = 0;
+                maxCpsValue = 0;
+                localStorage.removeItem('rosczony_clicks');
+                maxCPSDisplay.innerText = "0 CPS";
+                updateUI();
+            }
+        }
+
+        // Cargar estado inicial al entrar
+        window.onload = function() {
+            updateUI();
+        };
+    </script>
+</body>
+</html>
